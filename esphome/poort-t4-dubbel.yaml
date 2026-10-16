@@ -1,0 +1,573 @@
+# REFERENTIEKOPIE van de ESPHome-config (wachtwoorden vervangen door !secret).
+# De werkende versie staat in Home Assistant: /config/esphome/ (esp-poort-t4-test).
+# ==================================================================
+# DUBBELE POORT – Nice SNA20 x2 via Bus T4  (esp-poort-t4-test)
+#
+# Component + poortlogica komen van GitHub:
+#   https://github.com/stevefury/esphome-poort-t4
+#   (geen bestanden meer nodig in /config/esphome)
+#
+# PINNEN (ESP32-S3 DevKitC-1 N16R8) – allemaal op header J1, van boven naar onder
+#   GPIO4  TX poort 1 -> RX Grove RS485 #1
+#   GPIO5  RX poort 1 <- TX Grove RS485 #1
+#   GPIO6  TX poort 2 -> RX Grove RS485 #2
+#   GPIO7  RX poort 2 <- TX Grove RS485 #2
+#   GPIO15 Maglock poort 1 (D4184-module, hoog = aan)
+#   GPIO16 Maglock poort 2 (D4184-module, hoog = aan)
+#   GPIO17 P.P. poort 1 (PC817 + 330 Ω, hoog = puls)
+#   GPIO18 P.P. poort 2 (PC817 + 330 Ω, hoog = puls)
+#   GPIO9  Reed poort 1 (NO-reed: gesloten = poort 1 DICHT)        -> GND
+#   GPIO10 Reed poort 2 (NO-reed: gesloten = poort 2 VOLLEDIG OPEN) -> GND
+#   GPIO11 Drukknop 1 kant (voetganger)                    -> GND
+#   GPIO12 Drukknop 2 kanten                               -> GND
+#     ingangen: 3,3 kΩ naar 3V3 + 100/150 nF naar GND + 470 Ω serie
+#   Grove: VCC -> 3V3, GND -> GND
+#   klem: B -> RJ pos 3 (CANH), A -> RJ pos 4 (CANL), GND -> RJ pos 5
+#   RJ pos 2 (+28 V) NIET aansluiten. ESP gevoed via buck 5,2 V op 5V-pin.
+#   PC817: 1 anode <- 330 Ω <- GPIO, 2 kathode -> GND,
+#          4 collector -> P.P. (+), 3 emitter -> COM (-)  (polariteit meten!)
+#
+# REGELS
+#   - Poort 2 beweegt alleen als poort 1 >= "Poort 1 minimaal open".
+#   - Openen: poort 1 eerst, poort 2 vanaf "Poort 2 start bij openen".
+#   - Sluiten: poort 2 eerst, poort 1 vanaf "Poort 1 start bij sluiten".
+#   - Maglock aan vanaf "Maglock aan vanaf", los + wachttijd voor sluiten,
+#     direct los als een poort onverwacht sluit.
+#   - Na stilstand van de motor eerst "Pauze na stilstand" wachten
+#     voor een nieuw commando (anders negeert de SNA20 het).
+#   - Sluiten: poort 1 zakt niet onder "minimaal open" + 8 % zolang
+#     poort 2 nog niet helemaal dicht is (wacht daar even indien nodig).
+#   - Knoppen "P.P. poort 1/2 (1 puls)": handmatige stap-puls, maglock
+#     wordt eerst gelost. P.P. 2 geweigerd als poort 1 te ver dicht staat.
+#   - Bus weg > 30 s: reservemodus met P.P.-pulsen op tijd, vanaf de
+#     laatste bekende stand. Onzeker -> niets bewegen, bevestigen in HA.
+#   - Alle instellingen in HA, bewaard in de NVS van de ESP.
+#   Er zitten bewust GEEN instellingen in die de sturing wijzigen.
+# ==================================================================
+
+esphome:
+  name: esp-poort-t4-test
+  friendly_name: esp-poort-t4-test
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          auto &c = poort::ctl();
+          c.hal.now = []() -> uint32_t { return millis(); };
+          c.hal.bus_alive = [](int i) -> bool {
+            uint32_t t = (i == 0 ? id(bus_poort1) : id(bus_poort2))->get_last_rx_ms();
+            return t != 0 && (millis() - t) < 30000;
+          };
+          c.hal.bus_pos = [](int i) -> float {
+            return (i == 0 ? id(poort1) : id(poort2))->position;
+          };
+          c.hal.bus_op = [](int i) -> int {
+            auto o = (i == 0 ? id(poort1) : id(poort2))->current_operation;
+            if (o == cover::COVER_OPERATION_OPENING) return 1;
+            if (o == cover::COVER_OPERATION_CLOSING) return 2;
+            return 0;
+          };
+          c.hal.bus_cmd = [](int i, poort::Cmd k) {
+            auto *p = (i == 0 ? id(poort1) : id(poort2));
+            if (k == poort::C_OPEN) p->send_cmd(CMD_OPEN);
+            else if (k == poort::C_CLOSE) p->send_cmd(CMD_CLOSE);
+            else p->send_cmd(CMD_STOP);
+          };
+          c.hal.pp_out = [](int i, bool on) {
+            (i == 0 ? id(pp_opto1) : id(pp_opto2))->set_state(on);
+          };
+          c.hal.reed = [](int i) -> bool {
+            return (i == 0 ? id(reed1) : id(reed2))->state;
+          };
+          c.hal.maglock_out = [](int i, bool on) {
+            (i == 0 ? id(maglock1_out) : id(maglock2_out))->set_state(on);
+          };
+          c.hal.save_pos = [](int i, float p) {
+            if (i == 0) id(nvs_pos1) = p; else id(nvs_pos2) = p;
+          };
+          c.hal.log = [](const char *m) { ESP_LOGI("poort", "%s", m); };
+          c.begin(id(nvs_pos1), id(nvs_pos2));
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+  hardware_uart: USB_SERIAL_JTAG
+
+api:
+  encryption:
+    key: !secret poort_t4_api_key
+
+ota:
+  - platform: esphome
+    password: !secret poort_t4_ota_password   # in de echte YAML staat hier het wachtwoord
+
+wifi:
+  networks:
+  #- ssid: !secret wifi_ssid
+  #  password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid3
+    password: !secret wifi_password
+  min_auth_mode: WPA2
+
+#static ip
+#  manual_ip:
+ #   static_ip: 192.168.1.52
+  #  gateway: 192.168.1.1
+   # subnet: 255.255.255.0
+
+  ap:
+    ssid: "Esp-Poort-T4-Test"
+    password: !secret poort_t4_ap_password    # in de echte YAML staat hier het wachtwoord
+
+captive_portal:
+
+web_server:
+  port: 80
+
+external_components:
+  - source: github://stevefury/esphome-poort-t4@main
+    components: [bus_t4]
+    refresh: 0s              # bij elke installatie de nieuwste versie ophalen
+
+# ================= Bus T4 =================
+uart:
+  - id: uart_poort1
+    tx_pin: GPIO4
+    rx_pin: GPIO5
+    baud_rate: 19200
+  - id: uart_poort2
+    tx_pin: GPIO6
+    rx_pin: GPIO7
+    baud_rate: 19200
+
+bus_t4:
+  - id: bus_poort1
+    uart_id: uart_poort1
+    address: 0x0066
+  - id: bus_poort2
+    uart_id: uart_poort2
+    address: 0x0066
+
+# ================= Uitgangen =================
+output:
+  - platform: gpio
+    pin: GPIO15             # D4184 maglock poort 1
+    id: maglock1_out
+  - platform: gpio
+    pin: GPIO16             # D4184 maglock poort 2
+    id: maglock2_out
+  - platform: gpio
+    pin: GPIO17             # PC817 P.P. poort 1 (hoog = puls)
+    id: pp_opto1
+  - platform: gpio
+    pin: GPIO18             # PC817 P.P. poort 2 (hoog = puls)
+    id: pp_opto2
+
+# ================= Opslag in NVS =================
+globals:
+  - id: nvs_pos1
+    type: float
+    restore_value: true
+    initial_value: "-1.0"
+  - id: nvs_pos2
+    type: float
+    restore_value: true
+    initial_value: "-1.0"
+
+# ================= Covers =================
+cover:
+  # ruwe T4-covers (verborgen)
+  - platform: bus_t4
+    bus_t4_id: bus_poort1
+    id: poort1
+    name: "Poort 1 (T4 ruw)"
+    internal: true
+    auto_learn_timing: true
+    open_duration: 26s
+    close_duration: 26s
+    position_report_interval: 1s
+  - platform: bus_t4
+    bus_t4_id: bus_poort2
+    id: poort2
+    name: "Poort 2 (T4 ruw)"
+    internal: true
+    auto_learn_timing: true
+    open_duration: 26s
+    close_duration: 26s
+    position_report_interval: 1s
+
+  # covers voor Home Assistant (alles via de logica)
+  - platform: template
+    id: cover_poort1
+    name: "Poort 1"
+    device_class: gate
+    has_position: true
+    optimistic: false
+    open_action:
+      - lambda: poort::ctl().set_target(0, 1.0f);
+    close_action:
+      - lambda: poort::ctl().set_target(0, 0.0f);
+    stop_action:
+      - lambda: poort::ctl().stop_all();
+    position_action:
+      - lambda: poort::ctl().set_target(0, pos);
+
+  - platform: template
+    id: cover_poort2
+    name: "Poort 2"
+    device_class: gate
+    has_position: true
+    optimistic: false
+    open_action:
+      - lambda: poort::ctl().set_target(1, 1.0f);
+    close_action:
+      - lambda: poort::ctl().set_target(1, 0.0f);
+    stop_action:
+      - lambda: poort::ctl().stop_all();
+    position_action:
+      - lambda: poort::ctl().set_target(1, pos);
+
+  - platform: template
+    id: cover_dubbel
+    name: "Dubbele poort"
+    device_class: gate
+    has_position: true
+    optimistic: false
+    open_action:
+      - lambda: poort::ctl().open_all();
+    close_action:
+      - lambda: poort::ctl().close_all();
+    stop_action:
+      - lambda: poort::ctl().stop_all();
+
+# ================= Instellingen (HA, bewaard in NVS) =================
+number:
+  - platform: template
+    id: n_voet
+    name: "Voetganger opening"
+    icon: "mdi:walk"
+    unit_of_measurement: "%"
+    min_value: 20
+    max_value: 90
+    step: 1
+    initial_value: 50
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_open2
+    name: "Poort 2 start bij openen (poort 1 vanaf)"
+    unit_of_measurement: "%"
+    min_value: 10
+    max_value: 100
+    step: 1
+    initial_value: 50
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_close1
+    name: "Poort 1 start bij sluiten (poort 2 onder)"
+    unit_of_measurement: "%"
+    min_value: 0
+    max_value: 60
+    step: 1
+    initial_value: 5
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_p1min
+    name: "Poort 1 minimaal open voor poort 2"
+    unit_of_measurement: "%"
+    min_value: 10
+    max_value: 90
+    step: 1
+    initial_value: 40
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_maglock
+    name: "Maglock aan vanaf"
+    icon: "mdi:magnet"
+    unit_of_measurement: "%"
+    min_value: 70
+    max_value: 100
+    step: 1
+    initial_value: 90
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_release
+    name: "Wachttijd na maglock lossen"
+    icon: "mdi:timer-sand"
+    unit_of_measurement: "s"
+    min_value: 0.5
+    max_value: 10
+    step: 0.5
+    initial_value: 2
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_pause
+    name: "Pauze na stilstand motor"
+    icon: "mdi:timer-pause"
+    unit_of_measurement: "s"
+    min_value: 0
+    max_value: 5
+    step: 0.5
+    initial_value: 1.5
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_run_open
+    name: "Looptijd openen (reservemodus)"
+    unit_of_measurement: "s"
+    min_value: 10
+    max_value: 60
+    step: 0.5
+    initial_value: 26
+    restore_value: true
+    optimistic: true
+    entity_category: config
+  - platform: template
+    id: n_run_close
+    name: "Looptijd sluiten (reservemodus)"
+    unit_of_measurement: "s"
+    min_value: 10
+    max_value: 60
+    step: 0.5
+    initial_value: 26
+    restore_value: true
+    optimistic: true
+    entity_category: config
+
+# ================= Ingangen en statussen =================
+binary_sensor:
+  # ruwe reeds (verborgen, gebruikt door de logica)
+  # NO-reeds: contact DICHT bij magneet -> GPIO laag -> state true
+  - platform: gpio
+    id: reed1
+    name: "Poort 1 dicht (reed ruw)"
+    internal: true
+    pin:
+      number: GPIO9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on_off: 50ms
+
+  - platform: gpio
+    id: reed2
+    name: "Poort 2 volledig open (reed ruw)"
+    internal: true
+    pin:
+      number: GPIO10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on_off: 50ms
+
+  # reeds zoals Home Assistant ze toont: Open / Dicht
+  - platform: template
+    name: "Poort 1 (reed)"
+    device_class: opening
+    lambda: return !id(reed1).state;
+  - platform: template
+    name: "Poort 2 volledig open (reed)"
+    device_class: opening
+    lambda: return id(reed2).state;
+
+  - platform: gpio
+    id: drukknop1
+    name: "Drukknop 1 kant"
+    pin:
+      number: GPIO11
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      - lambda: poort::ctl().knop1();
+
+  - platform: gpio
+    id: drukknop2
+    name: "Drukknop 2 kanten"
+    pin:
+      number: GPIO12
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      - lambda: poort::ctl().knop2();
+
+  - platform: template
+    name: "Bus poort 1 verbinding"
+    device_class: connectivity
+    lambda: return poort::ctl().g[0].bus;
+  - platform: template
+    name: "Bus poort 2 verbinding"
+    device_class: connectivity
+    lambda: return poort::ctl().g[1].bus;
+  - platform: template
+    name: "Poort alarm"
+    device_class: problem
+    lambda: return poort::ctl().alarm();
+  - platform: template
+    name: "Poort reservemodus"
+    device_class: problem
+    lambda: return poort::ctl().reserve(0) || poort::ctl().reserve(1);
+  - platform: template
+    name: "Maglock poort 1"
+    icon: "mdi:magnet"
+    lambda: return poort::ctl().g[0].ml;
+  - platform: template
+    name: "Maglock poort 2"
+    icon: "mdi:magnet"
+    lambda: return poort::ctl().g[1].ml;
+
+  - platform: status
+    name: "Poort T4 status"
+
+text_sensor:
+  # worden enkel verstuurd als de tekst verandert (zie hoofdlus)
+  - platform: template
+    id: t_melding
+    name: "Poort melding"
+    icon: "mdi:message-alert"
+    update_interval: never
+  - platform: template
+    id: t_modus
+    name: "Poort modus"
+    icon: "mdi:state-machine"
+    update_interval: never
+  - platform: version
+    name: "Poort T4 ESPHome-versie"
+
+# ================= Knoppen in HA =================
+button:
+  - platform: template
+    name: "Knop 1 kant (voetganger)"
+    icon: "mdi:walk"
+    on_press:
+      - lambda: poort::ctl().knop1();
+  - platform: template
+    name: "Knop 2 kanten"
+    icon: "mdi:gate"
+    on_press:
+      - lambda: poort::ctl().knop2();
+  - platform: template
+    name: "Alles stop"
+    icon: "mdi:stop"
+    on_press:
+      - lambda: poort::ctl().stop_all();
+  - platform: template
+    name: "Stand bevestigen: alles dicht"
+    icon: "mdi:check"
+    entity_category: config
+    on_press:
+      - lambda: poort::ctl().confirm(0.0f, 0.0f);
+  - platform: template
+    name: "Stand bevestigen: alles open"
+    icon: "mdi:check"
+    entity_category: config
+    on_press:
+      - lambda: poort::ctl().confirm(1.0f, 1.0f);
+  - platform: template
+    name: "Stand bevestigen: poort 1 dicht, poort 2 open"
+    icon: "mdi:check"
+    entity_category: config
+    on_press:
+      - lambda: poort::ctl().confirm(0.0f, 1.0f);
+  # handmatige P.P.-puls (test / noodbediening, buiten de volgorde om)
+  # P.P. poort 2 wordt geweigerd als poort 1 zeker onder "minimaal open" staat
+  - platform: template
+    name: "P.P. poort 1 (1 puls)"
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    on_press:
+      - lambda: poort::ctl().manual_pp(0);
+  - platform: template
+    name: "P.P. poort 2 (1 puls)"
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    on_press:
+      - lambda: poort::ctl().manual_pp(1);
+  - platform: template
+    name: "Alarm resetten"
+    icon: "mdi:bell-off"
+    entity_category: config
+    on_press:
+      - lambda: poort::ctl().reset_alarm();
+  - platform: restart
+    name: "Poort T4 herstart"
+
+# ================= Hoofdlus =================
+interval:
+  - interval: 100ms
+    then:
+      - lambda: |-
+          auto &c = poort::ctl();
+          if (!c.booted) return;
+          // instellingen uit HA/NVS
+          c.set.voet         = id(n_voet).state / 100.0f;
+          c.set.open2_from   = id(n_open2).state / 100.0f;
+          c.set.close1_below = id(n_close1).state / 100.0f;
+          c.set.p1_min       = id(n_p1min).state / 100.0f;
+          c.set.maglock_from = id(n_maglock).state / 100.0f;
+          c.set.release_ms   = (uint32_t) (id(n_release).state * 1000.0f);
+          c.set.pause_ms     = (uint32_t) (id(n_pause).state * 1000.0f);
+          c.set.run_open_ms  = (uint32_t) (id(n_run_open).state * 1000.0f);
+          c.set.run_close_ms = (uint32_t) (id(n_run_close).state * 1000.0f);
+          c.loop();
+
+          // HA-covers bijwerken
+          auto pub = [](cover::Cover *cv, float pos, poort::Op op) {
+            auto o = op == poort::OP_OPENING ? cover::COVER_OPERATION_OPENING
+                   : op == poort::OP_CLOSING ? cover::COVER_OPERATION_CLOSING
+                                          : cover::COVER_OPERATION_IDLE;
+            if (std::fabs(cv->position - pos) >= 0.005f || cv->current_operation != o) {
+              cv->position = pos;
+              cv->current_operation = o;
+              cv->publish_state();
+            }
+          };
+          pub(id(cover_poort1), c.g[0].pos, c.g[0].op);
+          pub(id(cover_poort2), c.g[1].pos, c.g[1].op);
+          poort::Op od = poort::OP_IDLE;
+          if (c.g[0].op == poort::OP_OPENING || c.g[1].op == poort::OP_OPENING) od = poort::OP_OPENING;
+          else if (c.g[0].op == poort::OP_CLOSING || c.g[1].op == poort::OP_CLOSING) od = poort::OP_CLOSING;
+          pub(id(cover_dubbel), (c.g[0].pos + c.g[1].pos) / 2.0f, od);
+
+          // teksten alleen bij verandering
+          if (id(t_melding).state != c.msg) id(t_melding).publish_state(c.msg);
+          std::string m = c.mode_text();
+          if (id(t_modus).state != m) id(t_modus).publish_state(m);
+
+# ================= Diagnose =================
+sensor:
+  - platform: wifi_signal
+    name: "Poort T4 WiFi"
+    update_interval: 60s
+  - platform: uptime
+    name: "Poort T4 uptime"
