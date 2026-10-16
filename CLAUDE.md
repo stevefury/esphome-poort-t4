@@ -58,6 +58,8 @@ Zuivere C++ met HAL-callbacks (ingevuld in `on_boot` van de YAML), singleton `po
   poort 2 dicht en poort 1 op voetganger; beide open → poort 2 dicht.
 - Knop 2: niet alles open → alles open; alles open → alles dicht; iets beweegt → stop.
 - Maglocks aan vanaf 90 %, los + wachttijd (2 s) voor sluiten, noodlossing als een poort onverwacht sluit.
+  Bij sluiten één voor één: eerst maglock 2; maglock 1 pas als poort 2 ≤ close1_below + 15 % (`ML1_LEAD`),
+  dus ±3,5 s voor poort 1 vertrekt (speling voor wind die poort 2 sneller doet gaan).
   Reeds beslissen de maglock niet (behalve in reservemodus).
 - Reeds controleren enkel en geven een waarschuwing bij verschil met de encoder.
 - Bus weg > 30 s → reservemodus met P.P.-pulsen op tijd vanaf de laatste bekende stand (NVS).
@@ -82,5 +84,7 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 
 ## Open punten
 - Maglocks aansluiten en testen.
-- Sluitvolgorde opnieuw testen na de `shut2`-fix: poort 1 mag nergens meer stoppen.
-- Kijken of "Trailing size mismatch" vaker voorkomt en op welke UART.
+- Sluitvolgorde getest na de `shut2`-fix (log 16-10 21:17): poort 1 stopt niet meer. OK.
+- Maglocks één voor één (`ML1_LEAD`) nog testen op de poort (maglocks moeten dan aangesloten zijn).
+- "Trailing size mismatch" gezien op UART1 (poort 2, 16-10 21:17:39, motor draaide). Op poort 2 ontbreekt
+  de GND-draad naar RJ pos 5; Steve takt GND af van de reed-GND aan de printkant. Daarna opvolgen of het wegblijft.

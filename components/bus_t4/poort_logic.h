@@ -41,6 +41,7 @@ static const float CLOSE_FLOOR_MARGIN = 0.08f; // sluiten: poort 1 wacht op p1_m
 static const float END2_FROM = 0.10f;          // laatste stuk sluiten: poort 2 <= dit
 static const float END2_P1_MIN = 0.30f;        // laatste stuk sluiten: poort 1 minimaal open (i.p.v. p1_min)
 static const float END2_FLOOR_MARGIN = 0.05f;  // laatste stuk sluiten: poort 1 wacht op END2_P1_MIN + dit
+static const float ML1_LEAD = 0.15f;            // sluiten: maglock 1 los als poort 2 <= close1_below + dit
 static const uint32_t MANUAL_ML_BLOCK_MS = 4000;  // maglock niet terug aan na handmatige P.P.-puls
 
 struct Settings {
@@ -571,8 +572,11 @@ class Controller {
         may_close1 = (g[1].target <= TOL_END && g[1].pos <= set.close1_below) && g[0].pos > floor1;
       }
     }
-    // sluitreeks: maglock van poort 1 al lossen terwijl poort 2 sluit
-    if (pend2 && g[0].target >= 0.0f && g[0].target < g[0].pos - 0.01f) prerelease(0, now);
+    // sluitreeks: maglock van poort 1 lossen terwijl poort 2 sluit, maar pas kort voor
+    // poort 1 mag vertrekken (maglocks een voor een, poort 1 niet lang onvergrendeld)
+    const bool ml1_now = !(g[1].target >= 0.0f && g[1].target <= TOL_END) ||
+                         g[1].pos <= set.close1_below + ML1_LEAD + 0.005f;
+    if (pend2 && ml1_now && g[0].target >= 0.0f && g[0].target < g[0].pos - 0.01f) prerelease(0, now);
     if (te1 >= 0.0f || g[0].te >= 0.0f) move_toward(0, te1, may_close1);
 
     // poort 2

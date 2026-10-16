@@ -213,6 +213,22 @@ int main(){
     st("na 120s"); printf("  stops poort 1: %d, poort 1 terug open: %d, stops poort 2: %d, alarm: %d\n",p1stops,p1reopen,p2stops,C.alarm());
     CHECK(R[0].pos==0 && R[1].pos==0 && p1stops==0 && p1reopen==0 && p2stops==0 && !C.alarm_cmd);
   }
+  // ---------- 25: maglocks een voor een lossen bij sluiten ----------
+  puts("== 25 alles open -> dicht: maglock 2 eerst, maglock 1 pas bij poort 2 <= 55%");
+  reset(1,1); R[0].speed=1.0f/20400; R[1].speed=1.0f/23250; R[1].slow_below=0.10f; R[1].slow_f=0.37f; R[0].end_ms=R[1].end_ms=2000;
+  C.set.p1_min=0.35f; C.set.close1_below=0.40f; run(2000); CHECK(ML[0]&&ML[1]); C.close_all();
+  { float p2_ml1=-1, p2_p1start=-1; uint32_t t_ml1=0, t_p1=0; int p1stops=0, prev1=R[0].op;
+    for(int k=0;k<1200;k++){ T+=100; phys(100); C.loop();
+      if(p2_ml1<0 && !ML[0]){ p2_ml1=R[1].pos; t_ml1=T; }
+      if(p2_p1start<0 && R[0].op==2){ p2_p1start=R[1].pos; t_p1=T; }
+      if(prev1==2 && R[0].op==0 && R[0].pos>0) p1stops++; prev1=R[0].op; }
+    st("na 120s"); printf("  maglock 1 los bij p2=%.2f, poort 1 start bij p2=%.2f, %u ms onvergrendeld, stops poort 1: %d\n",p2_ml1,p2_p1start,t_p1-t_ml1,p1stops);
+    CHECK(R[0].pos==0 && R[1].pos==0 && p2_ml1<=0.56f && p2_ml1>=0.50f && p2_p1start>=0.38f && p2_p1start<=0.41f && t_p1-t_ml1<=4000 && p1stops==0); }
+  puts("== 25b idem, poort 2 door wind 1,6x sneller: poort 1 wacht hooguit even, geen overtreding");
+  reset(1,1); R[0].speed=1.0f/20400; R[1].speed=1.6f/23250; R[0].end_ms=R[1].end_ms=2000;
+  C.set.p1_min=0.35f; C.set.close1_below=0.40f; run(2000); C.close_all();
+  { float p2_p1start=-1; for(int k=0;k<1200;k++){ T+=100; phys(100); C.loop(); if(p2_p1start<0 && R[0].op==2) p2_p1start=R[1].pos; }
+    st("na 120s"); printf("  poort 1 start bij p2=%.2f\n",p2_p1start); CHECK(R[0].pos==0 && R[1].pos==0 && p2_p1start>=0.30f); }
   printf("\nGENEGEERDE COMMANDO'S (pauze 1,5 s): %d, STOPs verstuurd: %d\n",ignored,stops_sent);
   printf("\nVIOLATIONS/FAILS: %d\n",violations);
   return violations?1:0;
