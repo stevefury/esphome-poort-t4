@@ -52,7 +52,7 @@ Zuivere C++ met HAL-callbacks (ingevuld in `on_boot` van de YAML), singleton `po
   Vaste constanten `END2_FROM`, `END2_P1_MIN`, `END2_FLOOR_MARGIN`. Niet in reservemodus (daar blijft p1_min).
 - Encoder poort 2 ≤ 1 % telt als dicht (`shut2`), ook al meldt de SNA20 nog ±2 s "closing" (eindvertraging):
   geen grens meer voor poort 1 en geen STOP naar poort 2 (fix na log 16-10 21:04, poort 1 stopte op 34 %).
-- Gemeten looptijden: poort 1 open 26,9 s / dicht 29,3 s, poort 2 open 22,9 s. Bij sluiten is poort 1 sneller
+- Gemeten looptijden (SNA20): poort 1 open 26,0 s / dicht 25,0 s, poort 2 open 22,9 s / dicht ±29,3 s. Bij sluiten is poort 1 sneller
   (±4,9 %/s) dan poort 2 (±4,3 %/s, onder 10 % maar ±1,6 %/s). Zo nagebootst in sim-test 24.
 - Knop 1 (voetganger): poort 1 naar voet-% (50); nogmaals → poort 1 dicht; poort 2 open & 1 dicht →
   poort 2 dicht en poort 1 op voetganger; beide open → poort 2 dicht.
@@ -76,6 +76,7 @@ aparte NVS-sleutel per cover (`set_pref_salt`), `#include "poort_logic.h"` onder
 ## Bestanden
 - `esphome/poort-t4-dubbel.yaml`: referentiekopie van de ESPHome-config (wachtwoorden vervangen door `!secret`).
   De echte YAML staat in HA; Steve heeft daarin zijn eigen wachtwoorden.
+- `docs/poortmodule-bedrading-v3.html`: bedradingsschema v3 (open in een browser), met onderdelenlijst en pinout.
 - `test/sim.cpp`: simulatie (`g++ -std=c++17 test/sim.cpp -o sim && ./sim`, moet eindigen op `VIOLATIONS/FAILS: 0`).
 
 ## Node-RED / HA
