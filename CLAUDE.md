@@ -33,8 +33,8 @@ Vervangt een oude D1 mini met relais (die gaat eraf, ze draaien nooit samen).
 - Voeding: 12 V PSU → XY-2596 buck 5,2 V → 5V-pin (1N5819). Maglocks 12 V met 1N4007 over elke maglock
   (kathode op +, anode op LOAD van het D4184-bordje).
 - PC817: 1 anode ← 330 Ω ← GPIO, 2 kathode → GND, 4 collector → P.P.(+), 3 emitter → COM(−).
-- Status bouw: printplaat gebouwd. Maglocks en P.P. poort 1 nog **niet** aangesloten; P.P. poort 2 wel.
-  P.P./COM-polariteit op de SNA20 nog meten.
+- Status bouw: printplaat gebouwd. P.P. poort 1 en 2 aangesloten, polariteit gemeten en getest vanuit HA (werkt).
+  Maglocks nog **niet** aangesloten.
 
 ## Bus T4 (Nice)
 - 19200 8N1 met break. Motoradres 00.03, ons adres 0x0066. Encoder poort 1 0..1288, poort 2 0..1514.
@@ -47,6 +47,9 @@ Zuivere C++ met HAL-callbacks (ingevuld in `on_boot` van de YAML), singleton `po
 - Openen: poort 1 eerst, poort 2 vanaf poort 1 ≥ open2_from (50 %).
 - Sluiten: poort 2 eerst, poort 1 vanaf poort 2 ≤ close1_below (Steve gebruikt **50 %**).
   Poort 1 zakt niet onder p1_min + 8 % zolang poort 2 nog niet dicht is (fix na test 16-10).
+- Uitzondering laatste stuk sluiten (16-10): staat poort 2 bij sluiten op ≤ 10 % en zijn beide bussen in orde,
+  dan geldt 30 % i.p.v. p1_min: poort 2 mag sluiten zolang poort 1 ≥ 30 %, poort 1 stopt pas op 35 %.
+  Vaste constanten `END2_FROM`, `END2_P1_MIN`, `END2_FLOOR_MARGIN`. Niet in reservemodus (daar blijft p1_min).
 - Knop 1 (voetganger): poort 1 naar voet-% (50); nogmaals → poort 1 dicht; poort 2 open & 1 dicht →
   poort 2 dicht en poort 1 op voetganger; beide open → poort 2 dicht.
 - Knop 2: niet alles open → alles open; alles open → alles dicht; iets beweegt → stop.
@@ -74,7 +77,7 @@ Node-RED-flow geïmporteerd: alarm via `binary_sensor.garage_esp_poorthuis_t4_po
 tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.mobile_app_pixel_10_pro`.
 
 ## Open punten
-- P.P./COM-polariteit op beide SNA20's meten, daarna P.P. poort 1 aansluiten.
 - Maglocks aansluiten en testen.
-- Sluitvolgorde opnieuw testen na de fix (poort 1 mag niet meer terug opengaan).
+- Sluitvolgorde testen met de uitzondering laatste stuk (30 % / 10 %). In de simulatie stopt poort 1 nog kort
+  op 48 % als poort 2 merkbaar trager is dan poort 1 (test 20.0); bij gelijke snelheid niet meer (test 20.3).
 - Kijken of "Trailing size mismatch" vaker voorkomt en op welke UART.

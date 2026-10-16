@@ -6,6 +6,7 @@
 //
 // Poort 1 (index 0) ligt over poort 2 (index 1).
 // Harde regel: poort 2 beweegt alleen als poort 1 >= p1_min open staat.
+// Uitzondering: laatste stuk sluiten (poort 2 <= 10 %, beide bussen) -> poort 1 >= 30 %.
 // Openen: poort 1 eerst, poort 2 vanaf open2_from.
 // Sluiten: poort 2 eerst, poort 1 pas als poort 2 <= close1_below.
 // Reed 0: poort 1 dicht.  Reed 1: poort 2 volledig open.
@@ -37,6 +38,9 @@ static const uint32_t BUS_SETTLE_MS = 3000;    // bus pas gebruiken na 3 s stabi
 static const uint32_t STOP_COAST_MS = 3000;    // max. uitlooptijd na onze stop
 static const float ASSIST_MARGIN = 0.03f;     // poort 1 iets verder dan nodig openen
 static const float CLOSE_FLOOR_MARGIN = 0.08f; // sluiten: poort 1 wacht op p1_min + dit tot poort 2 dicht is
+static const float END2_FROM = 0.10f;          // laatste stuk sluiten: poort 2 <= dit
+static const float END2_P1_MIN = 0.30f;        // laatste stuk sluiten: poort 1 minimaal open (i.p.v. p1_min)
+static const float END2_FLOOR_MARGIN = 0.05f;  // laatste stuk sluiten: poort 1 wacht op END2_P1_MIN + dit
 static const uint32_t MANUAL_ML_BLOCK_MS = 4000;  // maglock niet terug aan na handmatige P.P.-puls
 
 struct Settings {
@@ -544,6 +548,11 @@ class Controller {
     const bool pend2 = !reached(1);
     float need = set.p1_min;
     if (pend2 && g[1].target > g[1].pos) need = std::fmax(set.p1_min, set.open2_from);
+    // laatste stuk sluiten van poort 2: lagere grens zodat poort 1 niet hoeft te stoppen
+    // (enkel met beide bussen, niet op geschatte standen in reservemodus)
+    const bool end2 = pend2 && g[0].bus && g[1].bus && g[1].target >= 0.0f &&
+                      g[1].target <= TOL_END && g[1].pos <= END2_FROM + 0.005f;
+    if (end2) need = END2_P1_MIN;
 
     // poort 1
     float te1 = g[0].target;
@@ -555,7 +564,8 @@ class Controller {
       } else {
         // poort 1 mag sluiten zodra poort 2 onder close1_below zit, maar zakt niet
         // onder p1_min + marge zolang poort 2 nog niet helemaal dicht is
-        const float floor1 = std::fmin(1.0f, set.p1_min + CLOSE_FLOOR_MARGIN);
+        const float floor1 = end2 ? END2_P1_MIN + END2_FLOOR_MARGIN
+                                  : std::fmin(1.0f, set.p1_min + CLOSE_FLOOR_MARGIN);
         may_close1 = (g[1].target <= TOL_END && g[1].pos <= set.close1_below) && g[0].pos > floor1;
       }
     }
@@ -565,7 +575,7 @@ class Controller {
 
     // poort 2
     if (pend2) {
-      if (g[0].pos + 0.005f < need || g[0].pos + 0.005f < set.p1_min) {
+      if (g[0].pos + 0.005f < need || (!end2 && g[0].pos + 0.005f < set.p1_min)) {
         hold(1);  // wachten op poort 1
         g[1].te = g[1].target;
       } else {

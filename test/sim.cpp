@@ -32,7 +32,10 @@ void phys(uint32_t dt){
     if(r.op==2 && ML[i]) violate("poort sluit tegen maglock");
     if(r.op==2 && close_t[i]==T && ML[i]) violate("sluit met maglock aan");
   }
-  if(R[1].op!=0 && R[0].pos<0.35f) violate("poort 2 beweegt terwijl poort 1 < 35%");
+  // laatste stuk sluiten (poort 2 <= 10 %) mag poort 1 tot 30 %
+  const bool end2 = R[1].op==2 && R[1].pos<=0.105f;
+  if(R[1].op!=0 && R[0].pos<0.35f && !end2) violate("poort 2 beweegt terwijl poort 1 < 35%");
+  if(R[1].op!=0 && R[0].pos<0.295f) violate("poort 2 beweegt terwijl poort 1 < 30%");
 }
 
 Controller C;
@@ -150,21 +153,24 @@ int main(){
   ignored=ig0;
 
   // ---------- 20: sluiten met overlap 50 % (zoals bij Steve) ----------
-  for (int variant=0; variant<3; variant++){
-    float c1 = variant==0?0.50f:(variant==1?0.05f:0.60f);
-    float sp2 = variant==2? 1.0f/40000 : 1.0f/34000;   // poort 2 trager dan poort 1
-    printf("== 20.%d alles dicht, close1_below=%.0f%%, poort 2 traag\n",variant,c1*100);
+  for (int variant=0; variant<4; variant++){
+    float c1 = variant==0?0.50f:(variant==1?0.05f:(variant==2?0.60f:0.50f));
+    float sp2 = variant==2? 1.0f/40000 : (variant==3? 1.0f/26000 : 1.0f/34000);   // poort 2 trager dan poort 1 (3: even snel)
+    printf("== 20.%d alles dicht, close1_below=%.0f%%, poort 2 %s\n",variant,c1*100,variant==3?"even snel":"traag");
     reset(1,1); R[1].speed=sp2; C.set.close1_below=c1; run(2000);
     C.close_all();
-    int p2stops=0, p1reopen=0; float p1min_while_p2=2; int prev2=R[1].op, prev1=R[0].op; float p2_at_p1start=-1;
+    int p2stops=0, p1reopen=0, p1stops=0; float p1min_while_p2=2, p1min_end2=2; int prev2=R[1].op, prev1=R[0].op; float p2_at_p1start=-1;
     for(int k=0;k<1500;k++){ T+=100; phys(100); C.loop();
       if(prev2==2 && R[1].op==0 && R[1].pos>0) p2stops++;
+      if(prev1==2 && R[0].op==0 && R[0].pos>0) p1stops++;
       if(R[0].op==1) p1reopen++;
-      if(R[1].op!=0 && R[0].pos<p1min_while_p2) p1min_while_p2=R[0].pos;
+      if(R[1].op!=0 && R[1].pos>0.105f && R[0].pos<p1min_while_p2) p1min_while_p2=R[0].pos;
+      if(R[1].op!=0 && R[0].pos<p1min_end2) p1min_end2=R[0].pos;
       if(p2_at_p1start<0 && R[0].op==2) p2_at_p1start=R[1].pos;
       prev2=R[1].op; prev1=R[0].op; }
-    st("na 150s"); printf("  p2 bij start p1: %.2f, stops poort 2: %d, poort 1 terug open: %d, min p1 terwijl p2 beweegt: %.2f\n",p2_at_p1start,p2stops,p1reopen,p1min_while_p2);
-    CHECK(R[0].pos==0 && R[1].pos==0 && p2stops==0 && p1reopen==0 && p1min_while_p2>=0.40f && p2_at_p1start<=c1+0.02f);
+    st("na 150s"); printf("  p2 bij start p1: %.2f, stops poort 2: %d, stops poort 1: %d, poort 1 terug open: %d, min p1 terwijl p2 > 10%% beweegt: %.2f, min p1 terwijl p2 beweegt: %.2f\n",p2_at_p1start,p2stops,p1stops,p1reopen,p1min_while_p2,p1min_end2);
+    CHECK(R[0].pos==0 && R[1].pos==0 && p2stops==0 && p1reopen==0 && p1min_while_p2>=0.40f && p1min_end2>=0.30f && p2_at_p1start<=c1+0.02f);
+    if(variant==3) CHECK(p1stops==0);
   }
   // ---------- 21: handmatige P.P. ----------
   puts("== 21a P.P. poort 1 met bus, alles dicht -> poort 1 opent");
@@ -178,6 +184,16 @@ int main(){
   saved[0]=0; saved[1]=0; reset(0,0,false); run(30000); C.manual_pp(0); run(5000); st("na 5s");
   printf("  echt %.2f, schatting %.2f\n",R[0].pos,C.g[0].pos); CHECK(R[0].op==1 && std::fabs(R[0].pos-C.g[0].pos)<0.08f);
   setup_hal();
+  // ---------- 22: laatste stuk sluiten, poort 2 blijft hangen ----------
+  puts("== 22 sluiten 50%, poort 2 blijft hangen op 5% -> poort 1 stopt op 35%, nooit onder 30%");
+  reset(1,1); C.set.close1_below=0.50f; run(2000); C.close_all();
+  { float p1min=2; for(int k=0;k<900;k++){ T+=100; phys(100); C.loop(); if(R[1].pos<=0.05f) R[1].speed=0; if(R[0].pos<p1min) p1min=R[0].pos; }
+    st("na 90s"); printf("  min p1: %.2f\n",p1min); CHECK(p1min>=0.30f && R[0].pos>=0.30f && R[0].pos<0.40f && R[1].pos>0); }
+  // ---------- 23: reservemodus: geen uitzondering, poort 1 blijft >= 40 % ----------
+  puts("== 23 reserve: alles open -> dicht, poort 1 blijft >= 40% zolang poort 2 beweegt");
+  saved[0]=1; saved[1]=1; reset(1,1,false); run(30000); C.set.close1_below=0.50f; C.close_all();
+  { float p1min=2; for(int k=0;k<1500;k++){ T+=100; phys(100); C.loop(); if(R[1].op!=0 && R[0].pos<p1min) p1min=R[0].pos; }
+    st("na 150s"); printf("  min p1 terwijl p2 beweegt: %.2f\n",p1min); CHECK(R[0].pos==0 && R[1].pos==0 && p1min>=0.38f); }
   printf("\nGENEGEERDE COMMANDO'S (pauze 1,5 s): %d, STOPs verstuurd: %d\n",ignored,stops_sent);
   printf("\nVIOLATIONS/FAILS: %d\n",violations);
   return violations?1:0;
