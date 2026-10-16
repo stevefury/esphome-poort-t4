@@ -76,7 +76,8 @@ aparte NVS-sleutel per cover (`set_pref_salt`), `#include "poort_logic.h"` onder
 ## Bestanden
 - `esphome/poort-t4-dubbel.yaml`: referentiekopie van de ESPHome-config (wachtwoorden vervangen door `!secret`).
   De echte YAML staat in HA; Steve heeft daarin zijn eigen wachtwoorden.
-- `docs/poortmodule-bedrading-v3.html`: bedradingsschema v3 (open in een browser), met onderdelenlijst en pinout.
+- `docs/bedrading.md`: bedradingsschema v3 als afbeelding (`poortmodule-bedrading-v3.svg`) met onderdelenlijst,
+  pinout en bouwnotities. Bron: `docs/poortmodule-bedrading-v3.html`.
 - `test/sim.cpp`: simulatie (`g++ -std=c++17 test/sim.cpp -o sim && ./sim`, moet eindigen op `VIOLATIONS/FAILS: 0`).
 
 ## Node-RED / HA
