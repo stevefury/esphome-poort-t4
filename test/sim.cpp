@@ -4,7 +4,9 @@
 #include <vector>
 using namespace poort;
 
-struct Real { float pos=0; int op=0; int pp=0; bool link=true; bool ppin=false; float speed=1.0f/26000; uint32_t stop_t=0; };
+struct Real { float pos=0; int op=0; int pp=0; bool link=true; bool ppin=false; float speed=1.0f/26000; uint32_t stop_t=0;
+  uint32_t end_ms=0, end_t=0;  // end_ms: motor meldt na 0 % nog zo lang "closing" (eindvertraging)
+  float slow_below=0, slow_f=1; };  // sluiten onder slow_below aan slow_f x snelheid (vertraging)
 int ignored=0, stops_sent=0;
 Real R[2]; uint32_t T=0; bool ML[2]={0,0}; uint32_t ml_off_t[2]={0,0}; uint32_t close_t[2]={0,0};
 int violations=0; bool verbose=false; float saved[2]={0,0};
@@ -28,14 +30,15 @@ void pp_edge(int i){ // SbS: closed->open, opening->stop, stop->reverse, open->c
 void phys(uint32_t dt){
   for(int i=0;i<2;i++){ Real&r=R[i];
     if(r.op==1){ r.pos+=dt*r.speed; if(r.pos>=1){r.pos=1;r.op=0;r.stop_t=T;} }
-    if(r.op==2){ r.pos-=dt*r.speed; if(r.pos<=0){r.pos=0;r.op=0;r.stop_t=T;} }
+    if(r.op==2){ r.pos-=dt*r.speed*(r.pos<r.slow_below ? r.slow_f : 1.0f); if(r.pos<=0){ r.pos=0; if(!r.end_t) r.end_t=T; if(T-r.end_t>=r.end_ms){r.op=0;r.stop_t=T;r.end_t=0;} } }
+    else r.end_t=0;
     if(r.op==2 && ML[i]) violate("poort sluit tegen maglock");
     if(r.op==2 && close_t[i]==T && ML[i]) violate("sluit met maglock aan");
   }
   // laatste stuk sluiten (poort 2 <= 10 %) mag poort 1 tot 30 %
   const bool end2 = R[1].op==2 && R[1].pos<=0.105f;
   if(R[1].op!=0 && R[0].pos<0.35f && !end2) violate("poort 2 beweegt terwijl poort 1 < 35%");
-  if(R[1].op!=0 && R[0].pos<0.295f) violate("poort 2 beweegt terwijl poort 1 < 30%");
+  if(R[1].op!=0 && R[1].pos>0.005f && R[0].pos<0.295f) violate("poort 2 beweegt terwijl poort 1 < 30%");
 }
 
 Controller C;
@@ -194,6 +197,22 @@ int main(){
   saved[0]=1; saved[1]=1; reset(1,1,false); run(30000); C.set.close1_below=0.50f; C.close_all();
   { float p1min=2; for(int k=0;k<1500;k++){ T+=100; phys(100); C.loop(); if(R[1].op!=0 && R[0].pos<p1min) p1min=R[0].pos; }
     st("na 150s"); printf("  min p1 terwijl p2 beweegt: %.2f\n",p1min); CHECK(R[0].pos==0 && R[1].pos==0 && p1min>=0.38f); }
+  // ---------- 24: eindvertraging poort 2 (log 16-10 21:04) ----------
+  for (int v=0; v<2; v++){
+    float pm = v==0 ? 0.35f : 0.40f;
+    printf("== 24.%d sluiten, poort 2 meldt 2 s 'closing' op 0%%, p1_min=%.0f%%, close1_below=40%%\n",v,pm*100);
+    // snelheden uit het log: poort 1 sluit 4,9 %/s, poort 2 4,3 %/s en onder 10 % maar 1,6 %/s
+    reset(1,1); R[0].speed=1.0f/20400; R[1].speed=1.0f/23250; R[1].slow_below=0.10f; R[1].slow_f=0.37f; R[0].end_ms=R[1].end_ms=2000;
+    C.set.p1_min=pm; C.set.close1_below=0.40f; run(2000); C.close_all();
+    int p1stops=0, p1reopen=0, p2stops=0; int prev1=R[0].op, prev2=R[1].op;
+    for(int k=0;k<1200;k++){ T+=100; phys(100); C.loop();
+      if(prev1==2 && R[0].op==0 && R[0].pos>0) p1stops++;
+      if(prev2==2 && R[1].op==0 && R[1].pos>0) p2stops++;
+      if(R[0].op==1) p1reopen++;
+      prev1=R[0].op; prev2=R[1].op; }
+    st("na 120s"); printf("  stops poort 1: %d, poort 1 terug open: %d, stops poort 2: %d, alarm: %d\n",p1stops,p1reopen,p2stops,C.alarm());
+    CHECK(R[0].pos==0 && R[1].pos==0 && p1stops==0 && p1reopen==0 && p2stops==0 && !C.alarm_cmd);
+  }
   printf("\nGENEGEERDE COMMANDO'S (pauze 1,5 s): %d, STOPs verstuurd: %d\n",ignored,stops_sent);
   printf("\nVIOLATIONS/FAILS: %d\n",violations);
   return violations?1:0;

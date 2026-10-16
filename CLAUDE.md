@@ -43,13 +43,17 @@ Vervangt een oude D1 mini met relais (die gaat eraf, ze draaien nooit samen).
 
 ## Logica (`components/bus_t4/poort_logic.h`, namespace `poort`)
 Zuivere C++ met HAL-callbacks (ingevuld in `on_boot` van de YAML), singleton `poort::ctl()`.
-- Poort 1 ligt over poort 2. **Harde regel: poort 2 beweegt alleen als poort 1 ≥ p1_min (40 %).**
+- Poort 1 ligt over poort 2. **Harde regel: poort 2 beweegt alleen als poort 1 ≥ p1_min** (standaard 40 %, Steve: **35 %**).
 - Openen: poort 1 eerst, poort 2 vanaf poort 1 ≥ open2_from (50 %).
-- Sluiten: poort 2 eerst, poort 1 vanaf poort 2 ≤ close1_below (Steve gebruikt **50 %**).
+- Sluiten: poort 2 eerst, poort 1 vanaf poort 2 ≤ close1_below (Steve: **40 %**). Openen: open2_from (Steve: **52 %**).
   Poort 1 zakt niet onder p1_min + 8 % zolang poort 2 nog niet dicht is (fix na test 16-10).
 - Uitzondering laatste stuk sluiten (16-10): staat poort 2 bij sluiten op ≤ 10 % en zijn beide bussen in orde,
   dan geldt 30 % i.p.v. p1_min: poort 2 mag sluiten zolang poort 1 ≥ 30 %, poort 1 stopt pas op 35 %.
   Vaste constanten `END2_FROM`, `END2_P1_MIN`, `END2_FLOOR_MARGIN`. Niet in reservemodus (daar blijft p1_min).
+- Encoder poort 2 ≤ 1 % telt als dicht (`shut2`), ook al meldt de SNA20 nog ±2 s "closing" (eindvertraging):
+  geen grens meer voor poort 1 en geen STOP naar poort 2 (fix na log 16-10 21:04, poort 1 stopte op 34 %).
+- Gemeten looptijden: poort 1 open 26,9 s / dicht 29,3 s, poort 2 open 22,9 s. Bij sluiten is poort 1 sneller
+  (±4,9 %/s) dan poort 2 (±4,3 %/s, onder 10 % maar ±1,6 %/s). Zo nagebootst in sim-test 24.
 - Knop 1 (voetganger): poort 1 naar voet-% (50); nogmaals → poort 1 dicht; poort 2 open & 1 dicht →
   poort 2 dicht en poort 1 op voetganger; beide open → poort 2 dicht.
 - Knop 2: niet alles open → alles open; alles open → alles dicht; iets beweegt → stop.
@@ -78,6 +82,5 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 
 ## Open punten
 - Maglocks aansluiten en testen.
-- Sluitvolgorde testen met de uitzondering laatste stuk (30 % / 10 %). In de simulatie stopt poort 1 nog kort
-  op 48 % als poort 2 merkbaar trager is dan poort 1 (test 20.0); bij gelijke snelheid niet meer (test 20.3).
+- Sluitvolgorde opnieuw testen na de `shut2`-fix: poort 1 mag nergens meer stoppen.
 - Kijken of "Trailing size mismatch" vaker voorkomt en op welke UART.

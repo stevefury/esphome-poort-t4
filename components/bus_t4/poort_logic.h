@@ -553,11 +553,13 @@ class Controller {
     const bool end2 = pend2 && g[0].bus && g[1].bus && g[1].target >= 0.0f &&
                       g[1].target <= TOL_END && g[1].pos <= END2_FROM + 0.005f;
     if (end2) need = END2_P1_MIN;
+    // encoder poort 2 al dicht, motor nog in eindvertraging: poort 2 telt als dicht
+    const bool shut2 = end2 && g[1].pos <= TOL_END;
 
     // poort 1
     float te1 = g[0].target;
     bool may_close1 = true;
-    if (pend2) {
+    if (pend2 && !shut2) {
       const float assist = std::fmin(1.0f, need + ASSIST_MARGIN);
       if (g[0].pos < assist - 0.01f && (te1 < assist || g[0].pos + 0.005f < need)) {
         te1 = (te1 > assist) ? te1 : assist;  // eerst ver genoeg open voor poort 2
@@ -575,7 +577,7 @@ class Controller {
 
     // poort 2
     if (pend2) {
-      if (g[0].pos + 0.005f < need || (!end2 && g[0].pos + 0.005f < set.p1_min)) {
+      if (!shut2 && (g[0].pos + 0.005f < need || (!end2 && g[0].pos + 0.005f < set.p1_min))) {
         hold(1);  // wachten op poort 1
         g[1].te = g[1].target;
       } else {
