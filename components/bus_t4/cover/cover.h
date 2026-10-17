@@ -10,6 +10,10 @@ namespace esphome::bus_t4 {
 // Position update interval during movement (ms)
 static constexpr uint32_t POSITION_UPDATE_INTERVAL = 500;
 
+// aanpassing: statuspakketten (STA 0x40) gelden als "live" zolang de laatste niet ouder is dan dit.
+// De SNA20 stuurt ze tijdens beweging om de ±983 ms; 1500 ms laat er één missen.
+static constexpr uint32_t STA_LIVE_MS = 1500;
+
 // Position threshold below which cover is considered fully closed
 static constexpr float CLOSED_POSITION_THRESHOLD = 0.007f;
 
@@ -178,6 +182,7 @@ class BusT4Cover : public cover::Cover, public BusT4Device, public Component {
   bool force_estimated_position_{false};  // Ignore encoder reports, always estimate from timing
   bool has_encoder_{false};          // True if device reports encoder positions
   uint32_t last_encoder_update_{0};  // Last time we got encoder data
+  uint32_t last_sta_ms_{0};          // aanpassing: laatste spontane statuspakket (STA 0x40)
 
   // State tracking for change detection
   cover::CoverOperation last_published_op_{cover::COVER_OPERATION_IDLE};

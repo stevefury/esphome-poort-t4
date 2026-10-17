@@ -72,6 +72,11 @@ Zuivere C++ met HAL-callbacks (ingevuld in `on_boot` van de YAML), singleton `po
 ## Component (`components/bus_t4`)
 Aangepaste makstech/esphome-BusT4 v1: `MULTI_CONF`, uart-nummer in logs, `get_last_rx_ms()` voor busbewaking,
 aparte NVS-sleutel per cover (`set_pref_salt`), `#include "poort_logic.h"` onderaan `bus_t4_component.h`.
+- Statuspakketten (17-10): de SNA20 stuurt tijdens beweging zelf om de ±983 ms een STA-pakket als command `0x40`
+  (STA 0xC0 − 0x80), naar 00.FF: `[02] [pos hi] [pos lo] [04 open / 05 dicht]`. Origineel werd dat genegeerd
+  en pollde de component elke `position_report_interval` (1 s) → botsingen ("Trailing size mismatch").
+  Nu: positie uit die pakketten (`update_position`), en tijdens beweging alleen pollen als er > 1,5 s
+  (`STA_LIVE_MS`) geen statuspakket kwam. Nog te bevestigen op de poort.
 
 ## Bestanden
 - `esphome/poort-t4-dubbel.yaml`: referentiekopie van de ESPHome-config (wachtwoorden vervangen door `!secret`).
@@ -88,5 +93,7 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 - Maglocks aansluiten en testen.
 - Sluitvolgorde getest na de `shut2`-fix (log 16-10 21:17): poort 1 stopt niet meer. OK.
 - Maglocks één voor één (`ML1_LEAD`) nog testen op de poort (maglocks moeten dan aangesloten zijn).
-- "Trailing size mismatch" gezien op UART1 (poort 2, 16-10 21:17:39, motor draaide). Op poort 2 ontbreekt
-  de GND-draad naar RJ pos 5; Steve takt GND af van de reed-GND aan de printkant. Daarna opvolgen of het wegblijft.
+- "Trailing size mismatch": ook gezien op poort 1 (met GND). Oorzaak: onze positievraag (±1005 ms) botste met
+  het statuspakket van de SNA20 (±983 ms), ze schuiven ±25 ms/s → ongeveer elke 35–40 s rijden. Fix: zie
+  Component/Statuspakketten. Testen: in het log "STA packet (0x40)" elke ±1 s, geen "Sending … 04.11" tijdens
+  rijden, en geen mismatch meer. GND naar RJ pos 5 op poort 2 trekt Steve toch (beter).

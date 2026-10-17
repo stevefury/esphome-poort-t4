@@ -103,7 +103,10 @@ void BusT4Cover::loop() {
 
     // Poll encoder position during movement (for devices that support it)
     // Robus devices don't support position queries during movement
-    if (!is_robus_ && init_ok_) {
+    // aanpassing: niet pollen zolang de sturing zelf statuspakketten stuurt; onze vraag
+    // botste daarmee op de bus ("Trailing size mismatch"). Poll alleen als ze uitblijven.
+    const bool sta_live = last_sta_ms_ != 0 && now - last_sta_ms_ < STA_LIVE_MS;
+    if (!is_robus_ && init_ok_ && !sta_live) {
       if (now - last_position_update_ >= position_report_interval_) {
         last_position_update_ = now;
         request_position();
@@ -444,6 +447,16 @@ void BusT4Cover::parse_dep_packet(const T4Packet &packet) {
       learn_open_position();
     }
     publish_state_if_changed();
+  }
+
+  // aanpassing: spontaan statuspakket tijdens beweging, zoals de SNA20 het stuurt
+  // (STA met 0x80 eraf, ±elke 983 ms): [0x02] [pos hi] [pos lo] [richting/doel].
+  // Geeft de encoderpositie zonder dat wij moeten pollen.
+  if (command == (STA - 0x80) && !is_walky_ && packet.size >= 13) {
+    uint16_t pos = (packet.data[DEP_DATA_OFFSET + 1] << 8) | packet.data[DEP_DATA_OFFSET + 2];
+    last_sta_ms_ = millis();
+    ESP_LOGD(TAG, "STA packet (0x40): pos=%d", pos);
+    update_position(pos);
   }
 }
 
