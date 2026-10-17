@@ -299,6 +299,9 @@ void BusT4Cover::parse_dep_packet(const T4Packet &packet) {
         if (current_operation != cover::COVER_OPERATION_OPENING) {
           movement_start_time_ = millis();
           position_at_start_ = this->position;
+          // aanpassing: niet meteen pollen bij de start; het eerste statuspakket volgt
+          // binnen 0,2-0,7 s en onze vraag botste daar soms mee. Na 1,5 s zonder: reservevraag.
+          last_sta_ms_ = movement_start_time_;
           // Start learning if opening from fully closed
           if (auto_learn_timing_ && this->position <= CLOSED_POSITION_THRESHOLD) {
             start_learning_open();
@@ -313,6 +316,9 @@ void BusT4Cover::parse_dep_packet(const T4Packet &packet) {
         if (current_operation != cover::COVER_OPERATION_CLOSING) {
           movement_start_time_ = millis();
           position_at_start_ = this->position;
+          // aanpassing: niet meteen pollen bij de start; het eerste statuspakket volgt
+          // binnen 0,2-0,7 s en onze vraag botste daar soms mee. Na 1,5 s zonder: reservevraag.
+          last_sta_ms_ = movement_start_time_;
           // Start learning if closing from fully open
           if (auto_learn_timing_ && this->position >= (1.0f - CLOSED_POSITION_THRESHOLD)) {
             start_learning_close();

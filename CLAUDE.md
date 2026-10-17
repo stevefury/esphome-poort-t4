@@ -79,6 +79,8 @@ aparte NVS-sleutel per cover (`set_pref_salt`), `#include "poort_logic.h"` onder
   (`STA_LIVE_MS`) geen statuspakket kwam. Getest 17-10: STA elke ±983 ms, geen mismatch meer.
 - Schatting op looptijd pas na 5 s zonder encoderwaarde (`ENCODER_FRESH_MS`, was 2 s): tijdens het uitlopen
   stuurt de SNA20 geen STA en sprong de positie terug (100 % -> 97 %). Ook beter voor de detectie "geblokkeerd".
+- Bij de start van een beweging ("Gate opening/closing") geldt de STA als live: geen positievraag tot het eerste
+  statuspakket (komt na 0,2-0,7 s), anders reservevraag na 1,5 s. De startvraag botste soms (log 17-10 10:48:37).
 
 ## Bestanden
 - `esphome/poort-t4-dubbel.yaml`: referentiekopie van de ESPHome-config (wachtwoorden vervangen door `!secret`).
@@ -94,6 +96,7 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 ## Open punten
 - Maglocks aansluiten en testen.
 - Sluitvolgorde getest na de `shut2`-fix (log 16-10 21:17): poort 1 stopt niet meer. OK.
+- Drukknoppen getest 17-10 (voetganger, alles open, alles dicht): OK.
 - Maglocks één voor één (`ML1_LEAD`) nog testen op de poort (maglocks moeten dan aangesloten zijn).
 - "Trailing size mismatch": ook gezien op poort 1 (met GND). Oorzaak: onze positievraag (±1005 ms) botste met
   het statuspakket van de SNA20 (±983 ms), ze schuiven ±25 ms/s → ongeveer elke 35–40 s rijden. Fix: zie
