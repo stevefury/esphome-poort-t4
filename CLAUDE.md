@@ -104,12 +104,12 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
   23u-controle (ook nieuwe melding "1 kant nog open"), postbode, actieknop "Sluiten" (= `close_cover` Dubbele poort).
   Flows staan lokaal bij Steve (niet in de repo: bevatten de alarmcode).
 - Reed-waarschuwing bij verschil met de encoder: werkt (17-10).
+- GND naar RJ pos 5 op poort 2 aangesloten (17-10).
+- Reservemodus (bus lostrekken, P.P.-pulsen, bus terug): werkt (17-10).
 
 ## Open punten
-- GND naar RJ pos 5 op poort 2 aansluiten (aftakking reed-GND aan printkant).
 - Maglocks aansluiten (D2/D3: streep naar +12 V) en testen: aan vanaf 90 %, één voor één los bij sluiten
   (`ML1_LEAD`), nooit sluiten tegen een vergrendelde maglock, noodlossing bij sluiten via afstandsbediening/P.P.
-- Reservemodus: bus van één poort lostrekken (> 30 s), openen/sluiten met P.P.-pulsen, bus terug.
 - Herstart (stroomonderbreking) met een poort half open: stand onbekend → "Stand bevestigen".
 - Obstakel / geblokkeerd: alarm in HA en melding via Node-RED op de Pixel.
 - Optioneel: aparte looptijden per poort voor de reservemodus (nu één waarde voor beide; poort 2 sluit ±4 s trager).
