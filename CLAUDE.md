@@ -107,10 +107,14 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 - GND naar RJ pos 5 op poort 2 aangesloten (17-10).
 - Reservemodus (bus lostrekken, P.P.-pulsen, bus terug): werkt (17-10).
 - Herstart met een poort half open: stand onbekend → "Stand bevestigen": werkt (17-10).
-- Looptijden reservemodus (één waarde voor beide poorten): opent en sluit goed, geen aparte tijden nodig (17-10).
 - Obstakel-/alarmmelding komt via Node-RED op de gsm (gezien tijdens de eerste tests, 16-10).
 
 ## Open punten
 - Maglocks aansluiten (D2/D3: streep naar +12 V) en testen: aan vanaf 90 %, één voor één los bij sluiten
   (`ML1_LEAD`), nooit sluiten tegen een vergrendelde maglock, noodlossing bij sluiten via afstandsbediening/P.P.
-- Knop "P.P. poort 2" wordt niet geweigerd als de stand van poort 1 onbekend is (bewust zo gelaten, 17-10).
+
+## Bewuste keuzes (geen open punt, Steve wil dit voorlopig zo laten)
+- Knop "P.P. poort 2 (1 puls)" wordt alleen geweigerd als de stand van poort 1 gekend is en onder p1_min ligt.
+  Bij onbekende stand (na herstart zonder bus, vóór "Stand bevestigen") gaat de puls wel door.
+- Reservemodus gebruikt één looptijd openen/sluiten voor beide poorten (gemeten: poort 1 ±26/25 s,
+  poort 2 ±23/29 s). Getest 17-10: opent en sluit goed. Aparte looptijden per poort pas als tussenstanden slecht kloppen.
