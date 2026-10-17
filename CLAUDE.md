@@ -94,20 +94,33 @@ Node-RED-flow geïmporteerd: alarm via `binary_sensor.garage_esp_poorthuis_t4_po
 tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.mobile_app_pixel_10_pro`.
 
 ## Getest op de poort (OK)
-- P.P. poort 1 en 2: polariteit en werking vanuit HA (16-10).
-- Alles open / alles dicht: volgorde, poort 1 stopt niet meer (`shut2`), log 16-10 21:17 en 17-10.
-- Maglock-volgorde in de logica (HA-status): eerst maglock 2, maglock 1 bij poort 2 ±55 % (17-10).
-- Drukknoppen: voetganger, alles open, alles dicht (17-10).
+Hardware en bus
+- Bus T4 op beide poorten (`[UART0]` poort 1, `[UART1]` poort 2), encoder poort 1 0..1288, poort 2 0..1514.
+- GND naar RJ pos 5 op poort 2 aangesloten (poort 1 had al GND) (17-10).
+- P.P. poort 1 en 2: polariteit gemeten, werking vanuit HA (16-10).
+- Reeds: poort 1 dicht / poort 2 volledig open kloppen met de encoder; reed-waarschuwing bij verschil werkt (17-10).
 - Statuspakketten (STA 0x40): positie elke ±983 ms, geen positievraag bij de start, geen
   "Trailing size mismatch" meer (17-10 10:58). Steve blijft opvolgen; komt de mismatch terug → log bekijken.
+- Geen positiesprong meer op het einde van een beweging (`ENCODER_FRESH_MS` 5 s) (17-10).
+
+Logica
+- Alles open: poort 1 eerst, poort 2 vanaf poort 1 ≥ open2_from (40 %), maglock-status aan vanaf 90 % (17-10).
+- Alles dicht: poort 2 eerst, poort 1 vanaf poort 2 ≤ close1_below (40 %), poort 1 stopt nergens meer
+  (`shut2`, ook tijdens de eindvertraging van poort 2) (16-10 21:17, 17-10).
+- Maglock-volgorde bij sluiten (HA-status, maglocks zelf nog niet aangesloten): eerst maglock 2, maglock 1 bij
+  poort 2 ±55 %, poort 1 ±3,5 s onvergrendeld i.p.v. ±16 s (17-10).
+- Drukknoppen: knop 1 voetganger (open/dicht), knop 2 alles open/alles dicht (17-10).
+- Reservemodus: bus lostrekken, openen/sluiten met P.P.-pulsen, bus terug (17-10).
+- Herstart met een poort half open: stand onbekend → "Stand bevestigen" (17-10).
+- Obstakel-/alarmmelding komt via Node-RED op de gsm (gezien tijdens de eerste tests, 16-10).
+
+Home Assistant / Node-RED
 - Node-RED-flows omgezet naar de nieuwe module en getest (17-10): meldingen open/dicht/10 min, badge 1 en 2 kanten,
   23u-controle (ook nieuwe melding "1 kant nog open"), postbode, actieknop "Sluiten" (= `close_cover` Dubbele poort).
   Flows staan lokaal bij Steve (niet in de repo: bevatten de alarmcode).
-- Reed-waarschuwing bij verschil met de encoder: werkt (17-10).
-- GND naar RJ pos 5 op poort 2 aangesloten (17-10).
-- Reservemodus (bus lostrekken, P.P.-pulsen, bus terug): werkt (17-10).
-- Herstart met een poort half open: stand onbekend → "Stand bevestigen": werkt (17-10).
-- Obstakel-/alarmmelding komt via Node-RED op de gsm (gezien tijdens de eerste tests, 16-10).
+
+Simulatie (`test/sim.cpp`, 0 fouten): o.a. sluiten met eindvertraging en gemeten snelheden (test 24),
+maglocks één voor één ook met wind (25/25b), poort 2 blijft hangen (22), reservemodus (23).
 
 ## Open punten
 - Maglocks aansluiten (D2/D3: streep naar +12 V) en testen: aan vanaf 90 %, één voor één los bij sluiten
