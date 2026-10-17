@@ -14,6 +14,11 @@ static constexpr uint32_t POSITION_UPDATE_INTERVAL = 500;
 // De SNA20 stuurt ze tijdens beweging om de ±983 ms; 1500 ms laat er één missen.
 static constexpr uint32_t STA_LIVE_MS = 1500;
 
+// aanpassing: zo lang blijft een encoderwaarde "vers" voor de schatting op looptijd inspringt.
+// Origineel 2000 ms; tijdens het uitlopen (±2-3 s) stuurt de SNA20 geen statuspakketten meer,
+// en de schatting deed de positie dan terugspringen (bv. 100 % -> 97 %).
+static constexpr uint32_t ENCODER_FRESH_MS = 5000;
+
 // Position threshold below which cover is considered fully closed
 static constexpr float CLOSED_POSITION_THRESHOLD = 0.007f;
 

@@ -86,7 +86,7 @@ void BusT4Cover::loop() {
     // Only use time-based position if we don't have recent encoder data
     // Encoder data is more accurate, so prioritize it when available
     bool use_time_based = true;
-    if (has_encoder_ && (now - last_encoder_update_ < 2000)) {
+    if (has_encoder_ && (now - last_encoder_update_ < ENCODER_FRESH_MS)) {
       // We have recent encoder data, don't override with time-based estimate
       use_time_based = false;
     }

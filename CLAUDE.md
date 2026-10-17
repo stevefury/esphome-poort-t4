@@ -45,7 +45,7 @@ Vervangt een oude D1 mini met relais (die gaat eraf, ze draaien nooit samen).
 Zuivere C++ met HAL-callbacks (ingevuld in `on_boot` van de YAML), singleton `poort::ctl()`.
 - Poort 1 ligt over poort 2. **Harde regel: poort 2 beweegt alleen als poort 1 ≥ p1_min** (standaard 40 %, Steve: **35 %**).
 - Openen: poort 1 eerst, poort 2 vanaf poort 1 ≥ open2_from (50 %).
-- Sluiten: poort 2 eerst, poort 1 vanaf poort 2 ≤ close1_below (Steve: **40 %**). Openen: open2_from (Steve: **52 %**).
+- Sluiten: poort 2 eerst, poort 1 vanaf poort 2 ≤ close1_below (Steve: **40 %**). Openen: open2_from (Steve: **40 %**).
   Poort 1 zakt niet onder p1_min + 8 % zolang poort 2 nog niet dicht is (fix na test 16-10).
 - Uitzondering laatste stuk sluiten (16-10): staat poort 2 bij sluiten op ≤ 10 % en zijn beide bussen in orde,
   dan geldt 30 % i.p.v. p1_min: poort 2 mag sluiten zolang poort 1 ≥ 30 %, poort 1 stopt pas op 35 %.
@@ -76,7 +76,9 @@ aparte NVS-sleutel per cover (`set_pref_salt`), `#include "poort_logic.h"` onder
   (STA 0xC0 − 0x80), naar 00.FF: `[02] [pos hi] [pos lo] [04 open / 05 dicht]`. Origineel werd dat genegeerd
   en pollde de component elke `position_report_interval` (1 s) → botsingen ("Trailing size mismatch").
   Nu: positie uit die pakketten (`update_position`), en tijdens beweging alleen pollen als er > 1,5 s
-  (`STA_LIVE_MS`) geen statuspakket kwam. Nog te bevestigen op de poort.
+  (`STA_LIVE_MS`) geen statuspakket kwam. Getest 17-10: STA elke ±983 ms, geen mismatch meer.
+- Schatting op looptijd pas na 5 s zonder encoderwaarde (`ENCODER_FRESH_MS`, was 2 s): tijdens het uitlopen
+  stuurt de SNA20 geen STA en sprong de positie terug (100 % -> 97 %). Ook beter voor de detectie "geblokkeerd".
 
 ## Bestanden
 - `esphome/poort-t4-dubbel.yaml`: referentiekopie van de ESPHome-config (wachtwoorden vervangen door `!secret`).
