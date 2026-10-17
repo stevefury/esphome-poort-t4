@@ -93,12 +93,21 @@ aparte NVS-sleutel per cover (`set_pref_salt`), `#include "poort_logic.h"` onder
 Node-RED-flow geïmporteerd: alarm via `binary_sensor.garage_esp_poorthuis_t4_poort_alarm` en de busverbindingen,
 tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.mobile_app_pixel_10_pro`.
 
+## Getest op de poort (OK)
+- P.P. poort 1 en 2: polariteit en werking vanuit HA (16-10).
+- Alles open / alles dicht: volgorde, poort 1 stopt niet meer (`shut2`), log 16-10 21:17 en 17-10.
+- Maglock-volgorde in de logica (HA-status): eerst maglock 2, maglock 1 bij poort 2 ±55 % (17-10).
+- Drukknoppen: voetganger, alles open, alles dicht (17-10).
+- Statuspakketten (STA 0x40): positie elke ±983 ms, geen positievraag bij de start, geen
+  "Trailing size mismatch" meer (17-10 10:58). Steve blijft opvolgen; komt de mismatch terug → log bekijken.
+
 ## Open punten
-- Maglocks aansluiten en testen.
-- Sluitvolgorde getest na de `shut2`-fix (log 16-10 21:17): poort 1 stopt niet meer. OK.
-- Drukknoppen getest 17-10 (voetganger, alles open, alles dicht): OK.
-- Maglocks één voor één (`ML1_LEAD`) nog testen op de poort (maglocks moeten dan aangesloten zijn).
-- "Trailing size mismatch": ook gezien op poort 1 (met GND). Oorzaak: onze positievraag (±1005 ms) botste met
-  het statuspakket van de SNA20 (±983 ms), ze schuiven ±25 ms/s → ongeveer elke 35–40 s rijden. Fix: zie
-  Component/Statuspakketten. Testen: in het log "STA packet (0x40)" elke ±1 s, geen "Sending … 04.11" tijdens
-  rijden, en geen mismatch meer. GND naar RJ pos 5 op poort 2 trekt Steve toch (beter).
+- GND naar RJ pos 5 op poort 2 aansluiten (aftakking reed-GND aan printkant).
+- Maglocks aansluiten (D2/D3: streep naar +12 V) en testen: aan vanaf 90 %, één voor één los bij sluiten
+  (`ML1_LEAD`), nooit sluiten tegen een vergrendelde maglock, noodlossing bij sluiten via afstandsbediening/P.P.
+- Reservemodus: bus van één poort lostrekken (> 30 s), openen/sluiten met P.P.-pulsen, bus terug.
+- Herstart (stroomonderbreking) met een poort half open: stand onbekend → "Stand bevestigen".
+- Obstakel / geblokkeerd: alarm in HA en melding via Node-RED op de Pixel.
+- Reed-waarschuwing bij verschil met de encoder.
+- Optioneel: aparte looptijden per poort voor de reservemodus (nu één waarde voor beide; poort 2 sluit ±4 s trager).
+- Knop "P.P. poort 2" wordt niet geweigerd als de stand van poort 1 onbekend is (bewust zo gelaten, 17-10).
