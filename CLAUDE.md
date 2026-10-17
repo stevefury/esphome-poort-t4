@@ -100,6 +100,9 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 - Drukknoppen: voetganger, alles open, alles dicht (17-10).
 - Statuspakketten (STA 0x40): positie elke ±983 ms, geen positievraag bij de start, geen
   "Trailing size mismatch" meer (17-10 10:58). Steve blijft opvolgen; komt de mismatch terug → log bekijken.
+- Node-RED-flows omgezet naar de nieuwe module en getest (17-10): meldingen open/dicht/10 min, badge 1 en 2 kanten,
+  23u-controle (ook nieuwe melding "1 kant nog open"), postbode, actieknop "Sluiten" (= `close_cover` Dubbele poort).
+  Flows staan lokaal bij Steve (niet in de repo: bevatten de alarmcode).
 
 ## Open punten
 - GND naar RJ pos 5 op poort 2 aansluiten (aftakking reed-GND aan printkant).
