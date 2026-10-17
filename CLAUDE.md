@@ -103,6 +103,7 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 - Node-RED-flows omgezet naar de nieuwe module en getest (17-10): meldingen open/dicht/10 min, badge 1 en 2 kanten,
   23u-controle (ook nieuwe melding "1 kant nog open"), postbode, actieknop "Sluiten" (= `close_cover` Dubbele poort).
   Flows staan lokaal bij Steve (niet in de repo: bevatten de alarmcode).
+- Reed-waarschuwing bij verschil met de encoder: werkt (17-10).
 
 ## Open punten
 - GND naar RJ pos 5 op poort 2 aansluiten (aftakking reed-GND aan printkant).
@@ -111,6 +112,5 @@ tekst uit `sensor.garage_esp_poorthuis_t4_poort_melding`, melding naar `notify.m
 - Reservemodus: bus van één poort lostrekken (> 30 s), openen/sluiten met P.P.-pulsen, bus terug.
 - Herstart (stroomonderbreking) met een poort half open: stand onbekend → "Stand bevestigen".
 - Obstakel / geblokkeerd: alarm in HA en melding via Node-RED op de Pixel.
-- Reed-waarschuwing bij verschil met de encoder.
 - Optioneel: aparte looptijden per poort voor de reservemodus (nu één waarde voor beide; poort 2 sluit ±4 s trager).
 - Knop "P.P. poort 2" wordt niet geweigerd als de stand van poort 1 onbekend is (bewust zo gelaten, 17-10).
