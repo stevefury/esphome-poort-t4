@@ -1,8 +1,8 @@
-# Poortmodule bedrading (v3)
+# Poortmodule bedrading (v4)
 
 Volledig schema voor de nieuwe print: voeding uit 12 V, ESP32-S3, Bus T4 naar beide Nice SNA20's, maglocks via MOSFET, reserve-P.P. via optocoupler, en gefilterde ingangen. Referenties (R1, C1, …) komen overeen met de onderdelenlijst.
 
-[![Schema poortmodule](poortmodule-bedrading-v3.svg)](poortmodule-bedrading-v3.svg)
+[![Schema poortmodule](poortmodule-bedrading-v4.svg)](poortmodule-bedrading-v4.svg)
 
 *Klik op het schema om het groot te openen.*
 
@@ -80,9 +80,12 @@ Een vlag (+12V, 3V3) of massateken betekent: verbonden met dat net, ook als er g
 - Leg CANH/CANL samen in één getwist paar van de UTP, met GND in een tweede paar.
 - 230 V-kant in een gesloten behuizing, met de klemafdekking van PS1 erop.
 
-## Status in de praktijk (16-10)
+## Status in de praktijk (17-10)
 
-- GND naar RJ pos 5 ontbreekt nog op **poort 2** (J3). Steve takt hem af van de reed-GND aan de printkant.
-- Maglocks (J4, J5) nog niet aangesloten. P.P. poort 1 en 2 (J6, J7) aangesloten en getest.
+- GND naar RJ pos 5 op beide poorten aangesloten (poort 2 via aftakking van de reed-GND aan de printkant).
+- P.P. poort 1 en 2 (J6, J7) aangesloten en getest.
+- Maglocks (J4, J5) nog niet aangesloten. Aansluiten volgens v4: maglock + aan +12 V, maglock − aan **LOAD**
+  van de D4184, diode over de maglock (streep aan +12 V). De **+** en **−** van de MOSFET-bordjes krijgen een
+  eigen draad van de voeding (+12 V na F1 of met eigen zekering).
 
-Bron: [`poortmodule-bedrading-v3.html`](poortmodule-bedrading-v3.html) (dezelfde inhoud, te openen in een browser).
+Bron: [`poortmodule-bedrading-v4.html`](poortmodule-bedrading-v4.html) (dezelfde inhoud, te openen in een browser).
